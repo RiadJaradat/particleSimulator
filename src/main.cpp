@@ -3,6 +3,8 @@
 #include <vector>
 #include <cmath>
 
+#include "DejaVuSans_font.h"
+
 const float gravity = 0.f;
 const float strength = 10.f;
 const float renderScale = 1 * std::pow(10, -5);
@@ -222,7 +224,7 @@ int main()
     sf::Text zoomText;
 
     window.setFramerateLimit(60);
-    font.loadFromFile("fonts/DejaVuSans.ttf");
+    font.loadFromMemory(embedded_font, embedded_font_len);
     simulationSpeedText.setFont(font);
     simulationSpeedText.setPosition({10, 10});
     zoomText.setFont(font);

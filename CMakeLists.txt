@@ -10,11 +10,12 @@ find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
 
 add_executable(ParticleSimulator src/main.cpp)
 
-add_custom_command(TARGET ParticleSimulator POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_SOURCE_DIR}/fonts"
-    "${CMAKE_BINARY_DIR}/fonts"
-)
+# Convert font file to a C header during build/configure
+file(READ "${CMAKE_SOURCE_DIR}/fonts/DejaVuSans.ttf" FONT_HEX HEX)
+string(REGEX REPLACE "([0-9a-f][0-9a-f])" "0x\\1, " FONT_C_ARRAY ${FONT_HEX})
+file(WRITE "${CMAKE_BINARY_DIR}/autogen/DejaVuSans_font.h" "const unsigned char embedded_font[] = { ${FONT_C_ARRAY} };\nconst unsigned int embedded_font_len = sizeof(embedded_font);")
+
+target_include_directories(ParticleSimulator PRIVATE "${CMAKE_BINARY_DIR}/autogen")
 
 target_link_libraries(ParticleSimulator PRIVATE
 	sfml-graphics
