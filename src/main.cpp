@@ -222,7 +222,7 @@ int main()
     sf::Text zoomText;
 
     window.setFramerateLimit(60);
-    font.loadFromFile("/usr/share/fonts/TTF/DejaVuSans.ttf");
+    font.loadFromFile("fonts/DejaVuSans.ttf");
     simulationSpeedText.setFont(font);
     simulationSpeedText.setPosition({10, 10});
     zoomText.setFont(font);
