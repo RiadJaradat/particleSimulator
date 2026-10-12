@@ -31,6 +31,7 @@ struct particle
     float mass = 1 * std::pow(10, 9); // 1,000,000,000 kg
     float area;
     float density;
+    float restitution = 0.4;
 
     sf::Vector2f position = {0, 0};
     sf::Vector2f oldPostion = {0, 0};
@@ -61,6 +62,21 @@ inline double calculateDistance(float delta_x, float delta_y)
 inline double calculateOrbitalVelocity(float mass, float distance)
 {
     return std::sqrt((gravitationalConstant * mass) / distance);
+}
+
+inline float dot(sf::Vector2f a, sf::Vector2f b)
+{
+    return a.x * b.x + a.y * b.y;
+}
+
+sf::Vector2f normalize(sf::Vector2f v)
+{
+    float length = std::sqrt(v.x * v.x + v.y * v.y);
+
+    if (length == 0.f)
+        return {0.f, 0.f};
+
+    return v / length;
 }
 
 bool checkCircleCollision(const sf::CircleShape &c1, const sf::CircleShape &c2)
@@ -138,21 +154,47 @@ void update(float dt)
 
             if (checkCircleCollision(part1.collisionCircle, part2.collisionCircle))
             {
-                part1.position = part1.oldPostion;
-                part2.position = part2.oldPostion;
+                sf::Vector2f relativeVelocity = {
+                    delta(part1.velocity.x, part2.velocity.x),
+                    delta(part1.velocity.y, part2.velocity.y)};
 
-                part1.collisionCircle.setPosition(part1.oldPostion);
-                part2.collisionCircle.setPosition(part2.oldPostion);
+                sf::Vector2f center1 =
+                    part1.position + sf::Vector2f(part1.radius, part1.radius);
 
-                part1.velocity.x -= (part1.velocity.x * 40.f / 100.f);
-                part1.velocity.y -= (part1.velocity.y * 40.f / 100.f);
-                part2.velocity.x -= (part2.velocity.x * 40.f / 100.f);
-                part2.velocity.y -= (part2.velocity.y * 40.f / 100.f);
+                sf::Vector2f center2 =
+                    part2.position + sf::Vector2f(part2.radius, part2.radius);
 
-                part1.velocity.x *= -1;
-                part1.velocity.y *= -1;
-                part2.velocity.x *= -1;
-                part2.velocity.y *= -1;
+                sf::Vector2f collisionNormal = normalize(center1 - center2);
+
+                float approachSpeed = -dot(relativeVelocity, collisionNormal);
+
+                float totalMass = part1.mass + part2.mass;
+
+                float effectiveMass =
+                    (part1.mass * part2.mass) / totalMass;
+
+                float impactEnergy = 0.5 * effectiveMass * std::pow(approachSpeed, 2);
+
+                float velocityAlongNormal = dot(relativeVelocity, collisionNormal);
+
+                if (velocityAlongNormal > 0.f)
+                    continue;
+
+                float restitution = (part1.restitution + part2.restitution) / 2.f;
+
+                float invMass1 = 1.f / part1.mass;
+                float invMass2 = 1.f / part2.mass;
+
+                float impulseMagnitude =
+                    -(1.f + restitution) * velocityAlongNormal / (invMass1 + invMass2);
+
+                sf::Vector2f impulse = impulseMagnitude * collisionNormal;
+
+                part1.velocity.x += impulse.x * invMass1;
+                part1.velocity.y += impulse.y * invMass1;
+
+                part2.velocity.x -= impulse.x * invMass2;
+                part2.velocity.y -= impulse.y * invMass2;
             }
         }
     }
@@ -176,20 +218,22 @@ void update(float dt)
 
 void keybinds(sf::View &camera)
 {
+    float speedLimit = 100;
+
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right))
     {
-        if (simulationSpeed >= 20)
+        if (simulationSpeed >= speedLimit)
         {
-            simulationSpeed = 20;
+            simulationSpeed = speedLimit;
             return;
         }
         simulationSpeed += 0.5f;
     }
     else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))
     {
-        if (simulationSpeed <= -20)
+        if (simulationSpeed <= -speedLimit)
         {
-            simulationSpeed = -20;
+            simulationSpeed = -speedLimit;
             return;
         }
         simulationSpeed -= 0.5f;
@@ -207,8 +251,8 @@ void keybinds(sf::View &camera)
     {
         zoom -= 0.01f;
 
-        if (zoom < 0.5f)
-            zoom = 0.5f;
+        if (zoom < 0.05f)
+            zoom = 0.05f;
 
         camera.setSize(originalSize / zoom);
     }
@@ -315,6 +359,9 @@ int main()
 
         keybinds(camera);
         update(dt * simulationSpeed);
+        
+        // particles.at(particles.size()-2).velocity.y -= 2500; // the rock
+
         simulationSpeedText.setString(std::to_string(simulationSpeed));
         zoomText.setString(std::to_string(zoom));
         camera.setCenter(
