@@ -13,6 +13,7 @@ const double gravitationalConstant = 5'000'0;
 
 float simulationSpeed = 20;
 float zoom = 2;
+bool dragging = false;
 
 sf::VideoMode desktop = sf::VideoMode(1920, 1080);
 sf::View camera(
@@ -23,6 +24,7 @@ sf::View camera(
         static_cast<float>(desktop.height)));
 
 sf::Vector2f originalSize = camera.getSize();
+sf::Vector2i previousMousePosition;
 
 struct particle
 {
@@ -216,7 +218,7 @@ void update(float dt)
     }
 }
 
-void keybinds(sf::View &camera)
+void keybinds(sf::RenderWindow &window, sf::View &camera)
 {
     float speedLimit = 100;
 
@@ -237,24 +239,6 @@ void keybinds(sf::View &camera)
             return;
         }
         simulationSpeed -= 0.5f;
-    }
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up))
-    {
-        zoom += 0.01f;
-
-        if (zoom > 2.5f)
-            zoom = 2.5f;
-
-        camera.setSize(originalSize / zoom);
-    }
-    else if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down))
-    {
-        zoom -= 0.01f;
-
-        if (zoom < 0.05f)
-            zoom = 0.05f;
-
-        camera.setSize(originalSize / zoom);
     }
 }
 
@@ -343,7 +327,11 @@ int main()
     particles.push_back(rock);
     particles.push_back(planet);
 
-    camera.zoom(2);
+    camera.zoom(0.5);
+
+    camera.setCenter(
+            (particles.back().position.x + particles.back().radius) * renderScale,
+            (particles.back().position.y + particles.back().radius) * renderScale);
 
     sf::CircleShape partCircle;
 
@@ -354,19 +342,61 @@ int main()
         {
             if (event.type == sf::Event::Closed)
                 window.close();
+
+            if (event.type == sf::Event::MouseButtonPressed &&
+                event.mouseButton.button == sf::Mouse::Left)
+            {
+                dragging = true;
+                previousMousePosition = sf::Mouse::getPosition(window);
+            }
+
+            if (event.type == sf::Event::MouseButtonReleased &&
+                event.mouseButton.button == sf::Mouse::Left)
+            {
+                dragging = false;
+            }
+
+            if (event.type == sf::Event::MouseMoved && dragging)
+            {
+                sf::Vector2i currentMousePosition =
+                    sf::Mouse::getPosition(window);
+
+                sf::Vector2f previousWorld =
+                    window.mapPixelToCoords(previousMousePosition, camera);
+
+                sf::Vector2f currentWorld =
+                    window.mapPixelToCoords(currentMousePosition, camera);
+
+                sf::Vector2f movement = previousWorld - currentWorld;
+
+                camera.move(movement);
+
+                previousMousePosition = currentMousePosition;
+            }
+
+            if (event.type == sf::Event::MouseWheelScrolled)
+            {
+                if (event.mouseWheelScroll.delta > 0)
+                    zoom *= 1.1f; // Zoom in
+                else
+                    zoom /= 1.1f; // Zoom out
+
+                zoom = std::round(zoom * 100.0f) / 100.0f;
+                zoom = std::clamp(zoom, 0.005f, 2.5f);
+
+                camera.setSize(originalSize / zoom);
+            }
         }
         float dt = deltaClock.restart().asSeconds();
 
-        keybinds(camera);
+        keybinds(window, camera);
         update(dt * simulationSpeed);
-        
+
         // particles.at(particles.size()-2).velocity.y -= 2500; // the rock
 
         simulationSpeedText.setString(std::to_string(simulationSpeed));
         zoomText.setString(std::to_string(zoom));
-        camera.setCenter(
-            (particles.back().position.x + particles.back().radius) * renderScale,
-            (particles.back().position.y + particles.back().radius) * renderScale);
+        /**/
         window.setView(camera);
         window.clear();
 
